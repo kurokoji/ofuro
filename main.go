@@ -80,7 +80,7 @@ func (f *FlowPatcher) FlowText(text string, startTime int) *FlowPatcher {
 		"borderw":    2,
 		"box":        0,
 		"boxborderw": 10,
-		"alpha": 0.8,
+		"alpha":      0.8,
 		"x":          expXString,
 	})
 
