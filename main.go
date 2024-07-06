@@ -40,9 +40,10 @@ type FlowTimeRange struct {
 }
 
 type FlowPatcher struct {
-	Conf   *Config
-	Stream *ffmpeg.Stream
-	Lines  [5]*FlowTimeRange
+	Conf        *Config
+	VideoStream *ffmpeg.Stream
+	AudioStream *ffmpeg.Stream
+	Lines       [5]*FlowTimeRange
 }
 
 func (f *FlowPatcher) FlowText(text string, startTime int) *FlowPatcher {
@@ -72,11 +73,10 @@ func (f *FlowPatcher) FlowText(text string, startTime int) *FlowPatcher {
 
 	expXString := fmt.Sprintf("w-(w+tw)*((n-%d*%s)/(%s*%d))", startTime, f.Conf.FpsString, f.Conf.FpsString, f.Conf.FlowTime)
 
-	res := f.Stream.Drawtext(text, 0, f.Conf.LinePadding*lineNum+f.Conf.FontSize*lineNum, false, ffmpeg.KwArgs{
+	res := f.VideoStream.Drawtext(text, 0, f.Conf.LinePadding*lineNum+f.Conf.FontSize*lineNum, false, ffmpeg.KwArgs{
 		"enable":     fmt.Sprintf("between(t,%d,%d)", startTime, startTime+f.Conf.FlowTime),
 		"fontcolor":  "white",
 		"fontsize":   f.Conf.FontSize,
-		"fontfile":   "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
 		"borderw":    2,
 		"box":        0,
 		"boxborderw": 10,
@@ -84,11 +84,13 @@ func (f *FlowPatcher) FlowText(text string, startTime int) *FlowPatcher {
 		"x":          expXString,
 	})
 
-	return &FlowPatcher{f.Conf, res, f.Lines}
+	return &FlowPatcher{Conf: f.Conf, VideoStream: res, AudioStream: f.AudioStream, Lines: f.Lines}
 }
 
 func (f *FlowPatcher) Run() error {
-	return f.Stream.Output(f.Conf.OutputFileName).OverWriteOutput().Run()
+	var streams []*ffmpeg.Stream = []*ffmpeg.Stream{f.VideoStream, f.AudioStream}
+
+	return ffmpeg.Concat(streams, ffmpeg.KwArgs{"v": 1, "a": 1}).Output(f.Conf.OutputFileName).OverWriteOutput().ErrorToStdOut().Run()
 }
 
 func NewFlowPatcher(fileName string, outputFileName string, flowTime int) (*FlowPatcher, error) {
@@ -112,20 +114,21 @@ func NewFlowPatcher(fileName string, outputFileName string, flowTime int) (*Flow
 	var lines [5]*FlowTimeRange
 
 	return &FlowPatcher{
-		Conf:   conf,
-		Stream: input,
-		Lines:  lines,
+		Conf:        conf,
+		VideoStream: input.Video(),
+		AudioStream: input.Audio(),
+		Lines:       lines,
 	}, nil
 }
 
 func main() {
-	patcher, err := NewFlowPatcher("./peco.mp4", "./peco-text.mp4", 5)
+	patcher, err := NewFlowPatcher("./deadlock.mp4", "./deadlock_comment.mp4", 5)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	err = patcher.FlowText("ほげ", 0).FlowText("ほげほげほげほげほげひおげほげ", 4).FlowText("popopo", 4).FlowText("popopopopo", 10).Run()
+	err = patcher.FlowText("ほげ😊", 0).FlowText("ほげほげほげほげほげひおげほげ", 4).FlowText("popopo", 4).FlowText("popopopopo", 10).Run()
 
 	if err != nil {
 		log.Println(err)
